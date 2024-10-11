@@ -1,0 +1,182 @@
+// App.js
+
+import React, { useState, useEffect, useRef } from "react";
+import Chart from "chart.js/auto";
+import "./App.css";
+
+function App() {
+  const [mass, setMass] = useState(1.0);
+  const [springConstant, setSpringConstant] = useState(10.0);
+  const [dampingCoefficient, setDampingCoefficient] = useState(0.5);
+  const [externalForce, setExternalForce] = useState(0);
+  const [initialDisplacement, setInitialDisplacement] = useState(1.0);
+  const [initialVelocity, setInitialVelocity] = useState(0.0);
+  const [duration, setDuration] = useState(10.0);
+
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+  const animationIdRef = useRef(null);
+
+  let x = initialDisplacement;
+  let v = initialVelocity;
+  let t = 0;
+  const dt = 0.016;
+  const pixelsPerMeter = 100;
+
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
+
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext("2d");
+    drawSimulation(ctx);
+    initializeChart();
+  }, []);
+
+  const initializeChart = () => {
+    const ctx = chartRef.current.getContext("2d");
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: "Displacement (m)",
+            data: [],
+            borderColor: "blue",
+            fill: false,
+          },
+          {
+            label: "Velocity (m/s)",
+            data: [],
+            borderColor: "red",
+            fill: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        title: {
+          display: true,
+          text: "Spring-Mass-Damper System Simulation",
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Time (s)",
+            },
+          },
+          y: {
+            title: {
+              display: true,
+              text: "Displacement (m) / Velocity (m/s)",
+            },
+          },
+        },
+      },
+    });
+
+    chartRef.current.chartInstance = chart;
+  };
+
+  const drawSimulation = (ctx) => {
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    ctx.beginPath();
+    ctx.moveTo(0, canvasRef.current.height / 2);
+    ctx.lineTo(canvasRef.current.width / 2 + x * pixelsPerMeter, canvasRef.current.height / 2);
+    ctx.strokeStyle = "#0000FF";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(canvasRef.current.width / 2 + x * pixelsPerMeter, canvasRef.current.height / 2, 20, 0, 2 * Math.PI);
+    ctx.fillStyle = "#FF0000";
+    ctx.fill();
+
+    ctx.fillStyle = "#000000";
+    ctx.font = "14px Arial";
+    ctx.fillText(`Time: ${t.toFixed(2)} s`, 10, 20);
+    ctx.fillText(`Displacement: ${x.toFixed(2)} m`, 10, 40);
+    ctx.fillText(`Velocity: ${v.toFixed(2)} m/s`, 10, 60);
+  };
+
+  const startSimulation = () => {
+    setIsSimulationRunning(true);
+    animate();
+  };
+
+  const stopSimulation = () => {
+    setIsSimulationRunning(false);
+    cancelAnimationFrame(animationIdRef.current);
+  };
+
+  const animate = () => {
+    if (!isSimulationRunning) return;
+
+    const ctx = canvasRef.current.getContext("2d");
+    const chart = chartRef.current.chartInstance;
+
+    const acceleration = (externalForce - springConstant * x - dampingCoefficient * v) / mass;
+    v += acceleration * dt;
+    x += v * dt;
+    t += dt;
+
+    drawSimulation(ctx);
+
+    chart.data.labels.push(t.toFixed(2));
+    chart.data.datasets[0].data.push(x.toFixed(2));
+    chart.data.datasets[1].data.push(v.toFixed(2));
+    chart.update();
+
+    animationIdRef.current = requestAnimationFrame(animate);
+  };
+
+  return (
+    <div className="app">
+      <h1>Spring-Mass-Damper System Simulation</h1>
+      <div className="controls">
+        <div>
+          <label>Mass (kg):</label>
+          <input type="number" value={mass} onChange={(e) => setMass(parseFloat(e.target.value))} step="0.1" />
+        </div>
+        <div>
+          <label>Spring Constant (N/m):</label>
+          <input type="number" value={springConstant} onChange={(e) => setSpringConstant(parseFloat(e.target.value))} step="0.1" />
+        </div>
+        <div>
+          <label>Damping Coefficient (Ns/m):</label>
+          <input type="number" value={dampingCoefficient} onChange={(e) => setDampingCoefficient(parseFloat(e.target.value))} step="0.1" />
+        </div>
+        <div>
+          <label>External Force (N):</label>
+          <input type="number" value={externalForce} onChange={(e) => setExternalForce(parseFloat(e.target.value))} step="0.1" />
+        </div>
+        <div>
+          <label>Initial Displacement (m):</label>
+          <input type="number" value={initialDisplacement} onChange={(e) => setInitialDisplacement(parseFloat(e.target.value))} step="0.1" />
+        </div>
+        <div>
+          <label>Initial Velocity (m/s):</label>
+          <input type="number" value={initialVelocity} onChange={(e) => setInitialVelocity(parseFloat(e.target.value))} step="0.1" />
+        </div>
+        <div>
+          <label>Duration (s):</label>
+          <input type="number" value={duration} onChange={(e) => setDuration(parseFloat(e.target.value))} step="0.1" />
+        </div>
+        <button onClick={startSimulation}>Start Simulation</button>
+        <button onClick={stopSimulation}>Stop Simulation</button>
+      </div>
+      <div className="container">
+        <div>
+          <h2>Spring-Mass-Damper Animation</h2>
+          <canvas ref={canvasRef} width="600" height="200"></canvas>
+        </div>
+        <div>
+          <h2>Displacement & Velocity Graph</h2>
+          <canvas ref={chartRef}></canvas>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
